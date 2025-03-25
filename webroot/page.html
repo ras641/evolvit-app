@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+  <title>Creature Simulation Viewer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #444;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      font-family: sans-serif;
+      color: white;
+    }
+
+    #infoPanel {
+      margin-bottom: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    canvas {
+      width: 500px;
+      height: 500px;
+      image-rendering: pixelated;
+      border: 1px solid #ccc;
+      display: block;
+    }
+  </style>
+</head>
+  <body>
+
+    <!-- Info panel ABOVE the canvas -->
+    <div id="infoPanel">
+      🧬 Creatures: <strong id="creatureCount">0</strong> |
+      🍎 Food: <strong id="foodCount">0</strong>
+      🎨 Sprites: <strong id="spriteCount">0</strong>
+      🖼️ Frame: <strong id="frameCount">0</strong>
+      📐 Deltas: <strong id="deltaCount">0</strong>
+    </div>
+
+    <!-- Canvas itself -->
+    <canvas id="simCanvas" width="500" height="500"></canvas>
+
+    <script type="application/javascript" src="script.js"></script>
+  </body>
+</html>
