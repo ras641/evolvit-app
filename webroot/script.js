@@ -1,11 +1,15 @@
 const canvas = document.getElementById("simCanvas");
 const ctx = canvas.getContext("2d");
+//const frameDisplay = document.getElementById("frame-counter");
 
-// Internal resolution
-canvas.width = 500;
-canvas.height = 500;
+const scale = window.devicePixelRatio || 1;
+
+canvas.width = 500 * scale;
+canvas.height = 500 * scale;
 canvas.style.width = "500px";
 canvas.style.height = "500px";
+
+ctx.scale(scale, scale); // Match drawing coordinates to visual scale;
 
 let currentState = {
   creatures: [],
@@ -13,8 +17,213 @@ let currentState = {
   sprites: {}
 };
 
-// 🔁 Rendering loop — draws full state every frame
+let CREATURES = {};
+let FOOD = new Set();
+let SPRITES = {};
+let deltaFrames = {};
+let currentFrame = 0;
+
+let lastRealTime = Date.now();
+let baseSimFrame = 0; // From /getstate
+let lastStateFetchTime = 0;
+
+
+function parseDeltaFrame(frameStr) {
+  const events = frameStr.match(/(s|m|r|o)\[[^\]]*\]/g) || [];
+
+  for (const e of events) {
+    if (e.startsWith("s[")) {
+      const [id, x, y, d, sprite] = e.slice(2, -1).split(",");
+      CREATURES[id] = {
+        id: +id,
+        position: [+x, +y],
+        direction: +d,
+        sprite_id: +sprite
+      };
+
+    } else if (e.startsWith("m[")) {
+      const parts = e.slice(2, -1).split(",");
+      const id = parts[0];
+      const creature = CREATURES[id];
+      if (!creature) continue;
+
+      for (let i = 1; i < parts.length; i++) {
+        const p = parts[i];
+        if (p.startsWith("x")) {
+          creature.position[0] = parseFloat(p.slice(1));
+        } else if (p.startsWith("y")) {
+          creature.position[1] = parseFloat(p.slice(1));
+        } else if (p.startsWith("d")) {
+          creature.direction = parseFloat(p.slice(1));
+        }
+      }
+
+    } else if (e.startsWith("r[")) {
+      const id = e.slice(2, -1);
+      delete CREATURES[id];
+
+    } else if (e.startsWith("o[")) {
+      const [id, newSprite] = e.slice(2, -1).split(",");
+      const creature = CREATURES[id];
+      if (creature) {
+        creature.sprite_id = +newSprite;
+        console.log(`🎨 Updated sprite_id of creature ${id} to ${newSprite}`);
+      }
+
+    } else {
+      // console.warn(`❓ Unknown delta event: ${e}`);
+    }
+  }
+}
+
+
+function parseFoodFrame(newStr, delStr) {
+  //console.log("🔥 Incoming food strings:", newStr, delStr);
+
+  const addMatches = newStr.match(/\[\d+,\d+\]/g) || [];
+  const delMatches = delStr.match(/\[\d+,\d+\]/g) || [];
+
+  for (const f of addMatches) {
+      const [x, y] = f.slice(1, -1).split(',').map(Number);
+      FOOD.add(`${x},${y}`);
+      //console.log(`✅ Added food at (${x}, ${y})`);
+  }
+
+  for (const f of delMatches) {
+      const [x, y] = f.slice(1, -1).split(',').map(Number);
+      FOOD.delete(`${x},${y}`);
+      //console.log(`❌ Removed food at (${x}, ${y})`);
+
+  }
+}
+
+
+
+// 🎨 Color scheme for organs
+function getOrganColor(type) {
+  switch (type) {
+    case "mouth": return "yellow";
+    case "eye": return "white";
+    case "flipper": return "orange";
+    case "spike": return "red";
+    default: return "#ccc";
+  }
+}
+
+
+
 function drawFrame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw food
+  ctx.fillStyle = "green";
+  for (const pos of FOOD) {
+    const [x, y] = pos.split(',').map(Number);
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+  // Draw creatures
+  for (const c of Object.values(CREATURES)) {
+    const angle = c.direction;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const layout = SPRITES[c.sprite_id];
+
+    const organs = layout.split("|").filter(Boolean).map(line => {
+      const [type, x, y, size] = line.split(",");
+      return {
+        type,
+        x: parseFloat(x),
+        y: parseFloat(y),
+        size: parseFloat(size),
+      };
+    });
+
+    const body = organs.find(o => o.type === "body") || { x: 0, y: 0 };
+    const body_rx = body.x * cos - body.y * sin;
+    const body_ry = body.x * sin + body.y * cos;
+    const cx = c.position[0] + body_rx;
+    const cy = c.position[1] + body_ry;
+
+    for (const organ of organs) {
+      if (organ.type === "body") continue;
+      const rx = organ.x * cos - organ.y * sin;
+      const ry = organ.x * sin + organ.y * cos;
+      const ox = c.position[0] + rx;
+      const oy = c.position[1] + ry;
+
+      switch (organ.type) {
+        case "spike": ctx.fillStyle = "red"; break;
+        case "mouth": ctx.fillStyle = "yellow"; break;
+        case "eye": ctx.fillStyle = "white"; break;
+        case "flipper": ctx.fillStyle = "orange"; break;
+        default: ctx.fillStyle = "#ccc"; break;
+      }
+
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(ox, oy);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(ox, oy, organ.size * 0.5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Draw name and ID above creature
+    if (showCreatureText) {
+      ctx.fillStyle = "white";
+      ctx.font = "8px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`${c.name} (${c.id})`, cx, cy - 10);
+    }
+  }
+
+  //frameDisplay.textContent = `Frame: ${currentFrame}`;
+  document.getElementById("frameCount").textContent = currentFrame
+}
+
+
+
+function advanceFrames() {
+      
+  const now = Date.now();
+  const elapsedMs = now - lastRealTime;
+  const targetFrame = baseSimFrame + Math.floor(elapsedMs / (1000 / 30));
+
+  let appliedDelta = false;
+
+  while (currentFrame < targetFrame) {
+    const delta = deltaFrames[currentFrame];
+    if (delta) {
+      parseDeltaFrame(delta.creatures || "");
+      parseFoodFrame(delta.new_food || "", delta.deleted_food || "");
+      appliedDelta = true;
+    }
+    currentFrame++;
+  }
+
+  if (appliedDelta) drawFrame(); // Only draw if we actually applied updates
+}
+
+
+//fetchSprites();
+
+setInterval(advanceFrames, 1000 / 30);
+
+
+
+// 🔁 Rendering loop — draws full state every frame
+function drawFrameOld() {
   ctx.clearRect(0, 0, 500, 500);
 
   // --- Draw food ---
@@ -93,7 +302,6 @@ function drawFrame() {
   requestAnimationFrame(drawFrame);
 }
 
-
 // 🧠 Helper: Parse layout string
 function parseLayout(layoutStr) {
   return layoutStr
@@ -110,22 +318,37 @@ function parseLayout(layoutStr) {
     });
 }
 
-// 🎨 Color scheme for organs
-function getOrganColor(type) {
-  switch (type) {
-    case "mouth": return "yellow";
-    case "eye": return "white";
-    case "flipper": return "orange";
-    case "spike": return "red";
-    default: return "#ccc";
-  }
-}
+
 
 // 🔄 Apply full state from backend
-function applyFullState({ creatures, food, sprites }) {
-  currentState.creatures = creatures;
-  currentState.food = food;
-  currentState.sprites = sprites;
+function applyFullState({ creatures, food, sprites, frame, deltas }) {
+  CREATURES = {};
+  FOOD = new Set();
+  deltaFrames = {};
+
+  for (const c of creatures) {
+    CREATURES[c.id] = {
+      id: c.id,
+      name: c.name,
+      position: c.position,
+      direction: c.direction || 0,
+      sprite_id: c.sprite_id
+    };
+  }
+
+  for (const f of food) {
+    FOOD.add(`${f[0]},${f[1]}`);
+  }
+
+  SPRITES = sprites
+
+  deltaFrames = deltas || {};
+
+  drawFrame();
+
+  currentFrame = frame + 1;
+  lastRealTime = Date.now();
+  baseSimFrame = frame + 1;
 }
 
 // 🔁 Devvit messaging
@@ -135,17 +358,38 @@ addEventListener("message", (event) => {
 
   switch (msg.type) {
     case "stateUpdate": {
-      const { state, frame, deltas, sprites } = msg.data;
+      const { status, message, state, frame, deltas, sprites } = msg.data;
 
-      // Update info panel
+      if (status === "pending") {
+        console.log("⏳ Backend says:", message || "Waiting for simulation...");
+        document.getElementById("status").textContent = message || "Simulation loading...";
+        return;
+      }
+
+      document.getElementById("status").textContent = ""; // Clear loading text
+
+      // ✅ Update info panel
       document.getElementById("creatureCount").textContent = state.creatures.length;
       document.getElementById("foodCount").textContent = state.food.length;
-      document.getElementById("frameCount").textContent = frame;
+      //document.getElementById("frameCount").textContent = frame;
       document.getElementById("deltaCount").textContent = Object.keys(deltas ?? {}).length;
       document.getElementById("spriteCount").textContent = Object.keys(sprites ?? {}).length;
 
-      // Apply new state
-      applyFullState({ ...state, sprites });
+      // Clear any loading message
+      document.getElementById("status").textContent = "";
+
+      if (state && frame != null && sprites && deltas) {
+        applyFullState({ ...state, sprites, frame, deltas });
+      } else {
+        console.warn("⚠️ Received malformed state update.");
+      }
+
+      break;
+    }
+
+    case "deltaFrame": {
+      const { frame, delta } = msg.data;
+      deltaFrames[frame] = delta;
       break;
     }
 
@@ -156,10 +400,18 @@ addEventListener("message", (event) => {
   }
 });
 
+let showCreatureText = false;
+
+document.getElementById('toggleText').addEventListener('click', () => {
+  showCreatureText = !showCreatureText;
+});
+
+
 // ✅ Signal to Devvit + polling every 10s
 addEventListener("load", () => {
   parent.postMessage({ type: "webViewReady" }, "*");
 
+  // Request full state every 10 seconds
   setInterval(() => {
     parent.postMessage({ type: "requestUpdate" }, "*");
   }, 10000);

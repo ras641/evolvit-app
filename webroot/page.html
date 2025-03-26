@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width"
     />
   <title>Creature Simulation Viewer</title>
   <style>
@@ -41,6 +41,7 @@
   <body>
 
     <!-- Info panel ABOVE the canvas -->
+    <div id="status" style="color: gray; font-weight: bold; margin-bottom: 10px;"></div>
     <div id="infoPanel">
       🧬 Creatures: <strong id="creatureCount">0</strong> |
       🍎 Food: <strong id="foodCount">0</strong>
@@ -49,8 +50,10 @@
       📐 Deltas: <strong id="deltaCount">0</strong>
     </div>
 
+
     <!-- Canvas itself -->
     <canvas id="simCanvas" width="500" height="500"></canvas>
+    <button id="toggleText">Toggle Text</button>
 
     <script type="application/javascript" src="script.js"></script>
   </body>
