@@ -3,6 +3,9 @@ const ctx = canvas.getContext("2d");
 //const frameDisplay = document.getElementById("frame-counter");
 
 
+// Draw something basic for testing
+ctx.fillStyle = 'red';
+ctx.fillRect(10, 10, 100, 100);
 
 let CREATURES = {};
 let FOOD = new Set();
