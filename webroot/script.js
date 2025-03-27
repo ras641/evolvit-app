@@ -2,22 +2,7 @@ const canvas = document.getElementById("simCanvas");
 const ctx = canvas.getContext("2d");
 //const frameDisplay = document.getElementById("frame-counter");
 
-const scale = window.devicePixelRatio || 1;
 
-// Match the displayed size (CSS) with physical pixel size (canvas)
-const displayWidth = canvas.clientWidth;
-const displayHeight = canvas.clientHeight;
-
-canvas.width = displayWidth * scale;
-canvas.height = displayHeight * scale;
-
-ctx.scale(scale, scale); // Coordinate system matches CSS pixels
-
-let currentState = {
-  creatures: [],
-  food: [],
-  sprites: {}
-};
 
 let CREATURES = {};
 let FOOD = new Set();
@@ -29,14 +14,24 @@ let lastRealTime = Date.now();
 let baseSimFrame = 0; // From /getstate
 let lastStateFetchTime = 0;
 
-const PARTY = ['ras641', 'llooide'];
+const PARTY = ['ras641', 'llooide', 'Kooky_Scene8956'];
 
 function parseDeltaFrame(frameStr) {
   const events = frameStr.match(/(s|m|r|o|e)\[[^\]]*\]/g) || [];
 
   for (const e of events) {
     if (e.startsWith("s[")) {
-      const [id, x, y, d, sprite, name, parent, creator] = e.slice(2, -1).split(",");
+      const [id, x, y, d, sprite, name, parentStr, creator] = e.slice(2, -1).split("|");
+
+      let parent_ids = [];
+      console.log("parentStr:", parentStr);
+      try {
+        const parent_ids = JSON.parse(parentStr);
+        console.log("Parsed parent_ids:", parent_ids);
+      } catch (e) {
+        console.error("Bad parentStr:", parentStr, e);
+      }
+
       CREATURES[id] = {
         id: +id,
         position: [+x, +y],
@@ -44,11 +39,12 @@ function parseDeltaFrame(frameStr) {
         sprite_id: +sprite,
         energy: 50,
         name,
-        parent_id: +parent,
+        parent_ids,
         creator
       };
-
-    } else if (e.startsWith("m[")) {
+    }
+    
+    else if (e.startsWith("m[")) {
       const parts = e.slice(2, -1).split(",");
       const id = parts[0];
       const creature = CREATURES[id];
@@ -64,12 +60,14 @@ function parseDeltaFrame(frameStr) {
           creature.direction = parseFloat(p.slice(1));
         }
       }
-
-    } else if (e.startsWith("r[")) {
+    }
+    
+    else if (e.startsWith("r[")) {
       const id = e.slice(2, -1);
       delete CREATURES[id];
-
-    } else if (e.startsWith("e[")) {
+    }
+    
+    else if (e.startsWith("e[")) {
       const parts = e.slice(2, -1).split(",");
       const id = parts[0];
       const newEnergy = parseInt(parts[1], 10);
@@ -134,12 +132,24 @@ function getOrganColor(type) {
 function drawFrame() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Draw food
-  ctx.fillStyle = "green";
   for (const pos of FOOD) {
     const [x, y] = pos.split(',').map(Number);
+    const r = 4;
+  
+    if (shading) {
+      const gradient = ctx.createRadialGradient(
+        x - r * 0.4, y - r * 0.4, r * 0.2,
+        x, y, r
+      );
+      gradient.addColorStop(0, "white");
+      gradient.addColorStop(1, "green");
+      ctx.fillStyle = gradient;
+    } else {
+      ctx.fillStyle = "green";
+    }
+  
     ctx.beginPath();
-    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
     ctx.fill();
   }
 
@@ -173,34 +183,72 @@ function drawFrame() {
       const ox = c.position[0] + rx;
       const oy = c.position[1] + ry;
 
-      switch (organ.type) {
-        case "spike": ctx.fillStyle = "red"; break;
-        case "mouth": ctx.fillStyle = "yellow"; break;
-        case "eye": ctx.fillStyle = "white"; break;
-        case "flipper": ctx.fillStyle = "orange"; break;
-        default: ctx.fillStyle = "#ccc"; break;
-      }
+      let baseColour = "grey";
 
+      switch (organ.type) {
+        case "spike": baseColour = "red"; break;
+        case "mouth": baseColour = "yellow"; break;
+        case "eye": baseColour = "white"; break;
+        case "flipper": baseColour = "orange"; break;
+        default: baseColour = "#ccc"; break;
+      }
+      
+      // Set fill style
+      if (shading) {
+        const gradient = ctx.createRadialGradient(
+          ox - organ.size * 0.4,
+          oy - organ.size * 0.4,
+          organ.size * 0.2,
+          ox,
+          oy,
+          organ.size
+        );
+        gradient.addColorStop(0, "white");
+        gradient.addColorStop(1, baseColour);
+        ctx.fillStyle = gradient;
+      } else {
+        ctx.fillStyle = baseColour;
+      }
+      
+      // Draw connector line to center of body
       ctx.strokeStyle = "#000";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(ox, oy);
       ctx.stroke();
-
+      
+      // Draw organ
       ctx.beginPath();
       ctx.arc(ox, oy, organ.size, 0, 2 * Math.PI);
       ctx.fill();
     }
 
-    ctx.fillStyle = "blue";
-    ctx.beginPath();
-    ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
-    ctx.fill();
+    if (shading) {
+      // Create a radial gradient centered on the organ
+      const gradient = ctx.createRadialGradient(cx - 3, cy - 3, 2, cx, cy, 8);
+      gradient.addColorStop(0, "white");         // light spot
+      gradient.addColorStop(1, "blue");          // base color (you can replace with a variable)
+
+      // Apply gradient and draw the shaded organ
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    else {
+
+      ctx.fillStyle = "blue";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
+      ctx.fill();
+    }
 
     if (c.creator && PARTY.includes(c.creator)){
       ctx.font = '22px sans-serif';
       ctx.textAlign = 'center';
+      ctx.fillStyle = 'white';
       ctx.fillText('🎩', cx, cy - 8);
     }
 
@@ -212,6 +260,7 @@ function drawFrame() {
       ctx.font = "8px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(`${c.name} (${c.id})`, c.position[0], c.position[1] - 10);
+      ctx.fillText(`${c.parent_ids.toString()}`, c.position[0], c.position[1] - 15);
 
       // Draw health bar
       const barWidth = 30;
@@ -231,7 +280,7 @@ function drawFrame() {
   }
 
   //frameDisplay.textContent = `Frame: ${currentFrame}`;
-  document.getElementById("frameCount").textContent = currentFrame
+  document.getElementById("frameCount").textContent = currentFrame;
 }
 
 
@@ -296,103 +345,6 @@ setInterval(advanceFrames, 1000 / 30);
 
 
 
-// 🔁 Rendering loop — draws full state every frame
-function drawFrameOld() {
-  ctx.clearRect(0, 0, 500, 500);
-
-  // --- Draw food ---
-  ctx.fillStyle = "green";
-  for (const [x, y] of currentState.food ?? []) {
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, 2 * Math.PI);
-    ctx.fill();
-  }
-
-  // ✅ Debug: Show how many creatures
-  //console.log("🧬 Drawing", currentState.creatures.length, "creatures");
-
-  for (const creature of currentState.creatures ?? []) {
-    const { position, direction, sprite_id } = creature;
-    const sprite = currentState.sprites?.[sprite_id];
-    const layout = sprite?.layout;
-    // ✅ Debug: Missing layout?
-    if (!layout) {
-      //console.warn("❌ Missing layout for sprite ID", sprite_id);
-      continue;
-    }
-
-    if (typeof layout !== "string") {
-      //console.warn("❌ Layout not a string for sprite ID", sprite_id, layout);
-      continue;
-    }
-
-    const organs = parseLayout(layout);
-    //console.log("🔍 Parsed organs for sprite", sprite_id, organs);
-
-    const cos = Math.cos(direction);
-    const sin = Math.sin(direction);
-
-    const body = organs.find(o => o.type === "body");
-    if (!body) {
-      //console.warn("❌ No body organ found for creature", creature);
-      continue;
-    }
-
-    const bodyX = position[0] + body.x * cos - body.y * sin;
-    const bodyY = position[1] + body.x * sin + body.y * cos;
-
-    // ✅ Debug: Log computed body position
-    //console.log("📍 Body position:", bodyX, bodyY);
-
-    // Draw organs
-    for (const organ of organs) {
-      if (organ.type === "body") continue;
-
-      const ox = position[0] + organ.x * cos - organ.y * sin;
-      const oy = position[1] + organ.x * sin + organ.y * cos;
-
-      // Line from body to organ
-      ctx.beginPath();
-      ctx.moveTo(bodyX, bodyY);
-      ctx.lineTo(ox, oy);
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Organ shape
-      ctx.beginPath();
-      ctx.arc(ox, oy, organ.size * 0.5, 0, 2 * Math.PI);
-      ctx.fillStyle = getOrganColor(organ.type);
-      ctx.fill();
-    }
-
-    // Draw body
-    ctx.beginPath();
-    ctx.arc(bodyX, bodyY, 8, 0, 2 * Math.PI);
-    ctx.fillStyle = "blue";
-    ctx.fill();
-  }
-
-  requestAnimationFrame(drawFrame);
-}
-
-// 🧠 Helper: Parse layout string
-function parseLayout(layoutStr) {
-  return layoutStr
-    .split("|")
-    .filter(Boolean)
-    .map(line => {
-      const [type, x, y, size] = line.split(",");
-      return {
-        type,
-        x: parseFloat(x),
-        y: parseFloat(y),
-        size: parseFloat(size ?? "0")
-      };
-    });
-}
-
-
 
 // 🔄 Apply full state from backend
 function applyFullState({ creatures, food, sprites, frame, deltas }) {
@@ -408,7 +360,7 @@ function applyFullState({ creatures, food, sprites, frame, deltas }) {
       direction: c.direction || 0,
       sprite_id: c.sprite_id,
       energy: c.energy,
-      parent_id: c.parent_id,
+      parent_ids: typeof c.parent_ids === "string" ? JSON.parse(c.parent_ids) : c.parent_ids,
       creator: c.creator
     };
   }
@@ -481,6 +433,11 @@ let showCreatureText = false;
 
 document.getElementById('toggleText').addEventListener('click', () => {
   showCreatureText = !showCreatureText;
+});
+
+let shading = false;
+document.getElementById('3D').addEventListener('click', () => {
+  shading = !shading;
 });
 
 

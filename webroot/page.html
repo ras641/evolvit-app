@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
-  >
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
   <title>Creature Simulation Viewer</title>
   <style>
     html, body {
@@ -21,53 +20,98 @@
       color: white;
     }
 
-    #infoPanel,
-    #framePanel {
-      margin-bottom: 10px;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 14px;
+    /* Ensure safe padding */
+    body {
+      padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
     }
 
-    #toggleText {
-      padding: 6px 12px;
-      font-size: 14px;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-
-    canvas {
+    /* Top bar stays on top */
+    .topBar {
       width: 100%;
-      height: auto;
-      max-width: 500px;
-      image-rendering: pixelated;
-      border: 1px solid #ccc;
-      display: block;
+      max-width: 70%;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.4);
+      box-sizing: border-box;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      gap: 10px;
     }
+
+    .leftGroup {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rightGroup {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #infoPanel,
+    #framePanel,
+    #toggleText,
+    #3D {
+      margin-top: 50px;
+      background: rgba(0, 0, 0, 0.6);
+      font-size: 14px;
+    }
+
+
+    /* Canvas container fills remaining space */
+    #canvas-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    /* Canvas is responsive and centered */
+    canvas {
+      width: 500px;
+      height: 500px;
+      background: rgb(51, 51, 51);
+      box-sizing: border-box;
+      padding-left: env(safe-area-inset-left, 0);
+      padding-right: env(safe-area-inset-right, 0);
+      padding-top: env(safe-area-inset-top, 0);
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
   </style>
 </head>
   <body>
 
-    <!-- Info panel ABOVE the canvas -->
-    <div id="status" style="color: gray; font-weight: bold; margin-bottom: 10px;"></div>
-    <div id="infoPanel">
-      🧬 Creatures: <strong id="creatureCount">0</strong> |
-      🍎 Food: <strong id="foodCount">0</strong>
-      🎨 Sprites: <strong id="spriteCount">0</strong>
+    <div class="topBar">
+      <div id="status" style="color: gray; font-weight: bold; margin-bottom: 10px;"></div>
+      <div class="leftGroup">
+        <div id="infoPanel">
+          🧬 Creatures: <strong id="creatureCount">0</strong>
+          🍎 Food: <strong id="foodCount">0</strong>
+          🎨 Sprites: <strong id="spriteCount">0</strong>
+        </div>
+        <div id="framePanel">
+          🖼️ Frame: <strong id="frameCount">0</strong>
+          📐 Deltas: <strong id="deltaCount">0</strong>
+        </div>
+      </div>
+      <div class="rightGroup">
+        <button id="toggleText">Show Info</button>
+        <button id="3D">2D/3D</button>
+      </div>
     </div>
-    <div id="framePanel">
-      🖼️ Frame: <strong id="frameCount">0</strong>
-      📐 Deltas: <strong id="deltaCount">0</strong>
-    </div>
-
 
     <!-- Canvas itself -->
-    <canvas id="simCanvas" width="500" height="500"></canvas>
-    <button id="toggleText">Show info</button>
+    <div id="canvas-container">
+      <canvas id="simCanvas" width="500" height="500"></canvas>
+    </div>
+    
 
     <script type="application/javascript" src="script.js"></script>
   </body>

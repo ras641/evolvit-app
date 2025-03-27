@@ -126,6 +126,12 @@ const CreatePage = (context) => {
         return;
       }
 
+      // Check that no part of the organ extends beyond [-50, 50]
+      if (x - size < -50 || x + size > 50 || y - size < -50 || y + size > 50) {
+        context.ui.showToast({ text: '❌ Organ extends outside the valid area (-50 to 50)' });
+        return;
+      }
+
       // Check against body (always at [0, 0], size 8)
       const dxBody = x - 0;
       const dyBody = y - 0;
@@ -213,10 +219,11 @@ const CreatePage = (context) => {
   return (
     <vstack gap="medium">
       <text size="xxlarge" weight="bold"> 🛠️ Create</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Organs can't touch or overlap each other</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Size is always measured by radius)</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• The main body is always size 8</text>
+      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Organs can't touch or overlap each other or the body</text>
+      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Size is always measured by radius</text>
+      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• The main body is always size 8 and in the center (0,0)</text>
       <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• No part of any organ can go outside -50 to 50 in x or y</text>
+      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Flippers always face in positive X</text>
       <hstack gap="small" alignment="center">
         <button size="small" width="30%" onPress={() => context.ui.showForm(nameForm)}>
           📝 Edit Name
@@ -258,32 +265,47 @@ const CreatePage = (context) => {
 };
 
 const InfoPage = () => (
-  <vstack gap="medium">
+  <vstack gap="small">
     <text size="xxlarge" weight="bold"> ℹ️ Info</text>
-    <text>Think you know what it takes to survive in the harsh, unforgiving Evolvit landscape. Build your creature and see if it can survive or even thrive in a dynamic world</text>
-    
+    <text size="xsmall">Think you know what it takes in the harsh, unforgiving Evolvit landscape.</text>
+    <text size="xsmall">Build your creature and see if it can survive or even thrive in a dynamic world</text>
+    <text size="xsmall">Creatures will lose energy over time unless they eat food at 0 they will die 🟢</text>
+    <text size="xsmall">Creatures all begin with 50/100 energy</text>
+    <text size="xsmall">At 100 energy creatures will use 60 energy to reproduce a mutated offspring</text>
+    <text size="xsmall">Offspring spawn with 50 energy</text>
+
+    <text size="xsmall">All creatures have a central body 🔵 of radius 8</text>
+    <text size="xsmall">They then have up to 5 of 4 optional organs with optional radius</text>
+    <text size="xsmall">🟡 Mouth: highly recommend at least one you will need this to eat</text>
+    <text size="xsmall">🟠 Flipper: uses energy to generate thrust, helpful for moving</text>
+    <text size="xsmall">🔴 Spike: Kills other creatures on contact or their organs on contact. also costs energy over time</text>
+    <text size="xsmall">⚪ Eye: doesn't do anything (yet)</text>
   </vstack>
 );
 
 const SpecsPage = () => (
   <vstack gap="small">
     <text size="xxlarge" weight="bold"> 🤓 Specifications</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Frame rate: 30 FPS (frames per second)</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• e/f = energy per frame (30 frames = 1 second)</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Max energy: 100</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• BMR (basic survival cost): 0.01 e/f (0.3 e/s)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Frame rate: 30 FPS (frames per second)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• e/f = energy per frame (30 frames = 1 second)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Max energy: 100</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• BMR (basic survival cost): 0.01 e/f (0.3 e/s)</text>
 
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Spike organ:</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Kills organs upon contact, kills creatures on body contact</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Energy use: 0.001 × size (radius in pixels) e/f (0.03 × size per second)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Spike organ:</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Kills organs upon contact, kills creatures on body contact</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Energy use: 0.001 × size (radius in pixels) e/f (0.03 × size per second)</text>
 
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Flipper organ:</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Generates thrust</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Energy use: 0.001 × size (radius in pixels) e/f (0.03 × size per second)</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Force output: 0.5 × size (in px × mass / frame²) (I think?)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Flipper organ:</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Generates thrust</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Energy use: 0.001 × size (radius in pixels) e/f (0.03 × size per second)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Force output: 0.5 × size (in px × mass / frame²) (I think?)</text>
     
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Acceleration = Force ÷ mass (heavier creatures accelerate less)</text>
-    <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• All objects have equal density, so mass depends on total size</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Acceleration = Force ÷ mass (heavier creatures accelerate less)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• All objects have equal density, so mass depends on total size</text>
+  
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Food growth rate decreases according to a power law as the number of creatures increases</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Food spawn delay = 0.05 × (num creatures) ^ 1.5</text>
+
   </vstack>
 );
 
