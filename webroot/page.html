@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta
       name="viewport"
-      content="width=device-width"
-    />
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+  >
   <title>Creature Simulation Viewer</title>
   <style>
     html, body {
@@ -21,7 +21,8 @@
       color: white;
     }
 
-    #infoPanel {
+    #infoPanel,
+    #framePanel {
       margin-bottom: 10px;
       background: rgba(0, 0, 0, 0.6);
       padding: 6px 12px;
@@ -29,9 +30,20 @@
       font-size: 14px;
     }
 
+    #toggleText {
+      padding: 6px 12px;
+      font-size: 14px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
     canvas {
-      width: 500px;
-      height: 500px;
+      width: 100%;
+      height: auto;
+      max-width: 500px;
       image-rendering: pixelated;
       border: 1px solid #ccc;
       display: block;
@@ -46,6 +58,8 @@
       🧬 Creatures: <strong id="creatureCount">0</strong> |
       🍎 Food: <strong id="foodCount">0</strong>
       🎨 Sprites: <strong id="spriteCount">0</strong>
+    </div>
+    <div id="framePanel">
       🖼️ Frame: <strong id="frameCount">0</strong>
       📐 Deltas: <strong id="deltaCount">0</strong>
     </div>
@@ -53,7 +67,7 @@
 
     <!-- Canvas itself -->
     <canvas id="simCanvas" width="500" height="500"></canvas>
-    <button id="toggleText">Toggle Text</button>
+    <button id="toggleText">Show info</button>
 
     <script type="application/javascript" src="script.js"></script>
   </body>

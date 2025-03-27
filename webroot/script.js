@@ -4,12 +4,14 @@ const ctx = canvas.getContext("2d");
 
 const scale = window.devicePixelRatio || 1;
 
-canvas.width = 500 * scale;
-canvas.height = 500 * scale;
-canvas.style.width = "500px";
-canvas.style.height = "500px";
+// Match the displayed size (CSS) with physical pixel size (canvas)
+const displayWidth = canvas.clientWidth;
+const displayHeight = canvas.clientHeight;
 
-ctx.scale(scale, scale); // Match drawing coordinates to visual scale;
+canvas.width = displayWidth * scale;
+canvas.height = displayHeight * scale;
+
+ctx.scale(scale, scale); // Coordinate system matches CSS pixels
 
 let currentState = {
   creatures: [],
@@ -27,18 +29,23 @@ let lastRealTime = Date.now();
 let baseSimFrame = 0; // From /getstate
 let lastStateFetchTime = 0;
 
+const PARTY = ['ras641', 'llooide'];
 
 function parseDeltaFrame(frameStr) {
-  const events = frameStr.match(/(s|m|r|o)\[[^\]]*\]/g) || [];
+  const events = frameStr.match(/(s|m|r|o|e)\[[^\]]*\]/g) || [];
 
   for (const e of events) {
     if (e.startsWith("s[")) {
-      const [id, x, y, d, sprite] = e.slice(2, -1).split(",");
+      const [id, x, y, d, sprite, name, parent, creator] = e.slice(2, -1).split(",");
       CREATURES[id] = {
         id: +id,
         position: [+x, +y],
         direction: +d,
-        sprite_id: +sprite
+        sprite_id: +sprite,
+        energy: 50,
+        name,
+        parent_id: +parent,
+        creator
       };
 
     } else if (e.startsWith("m[")) {
@@ -62,12 +69,24 @@ function parseDeltaFrame(frameStr) {
       const id = e.slice(2, -1);
       delete CREATURES[id];
 
+    } else if (e.startsWith("e[")) {
+      const parts = e.slice(2, -1).split(",");
+      const id = parts[0];
+      const newEnergy = parseInt(parts[1], 10);
+
+      if (CREATURES[id]) {
+        
+        CREATURES[id].energy = newEnergy;
+        
+      }
+      
+
     } else if (e.startsWith("o[")) {
       const [id, newSprite] = e.slice(2, -1).split(",");
       const creature = CREATURES[id];
       if (creature) {
         creature.sprite_id = +newSprite;
-        console.log(`🎨 Updated sprite_id of creature ${id} to ${newSprite}`);
+        
       }
 
     } else {
@@ -146,7 +165,7 @@ function drawFrame() {
     const body_ry = body.x * sin + body.y * cos;
     const cx = c.position[0] + body_rx;
     const cy = c.position[1] + body_ry;
-
+    
     for (const organ of organs) {
       if (organ.type === "body") continue;
       const rx = organ.x * cos - organ.y * sin;
@@ -170,7 +189,7 @@ function drawFrame() {
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(ox, oy, organ.size * 0.5, 0, 2 * Math.PI);
+      ctx.arc(ox, oy, organ.size, 0, 2 * Math.PI);
       ctx.fill();
     }
 
@@ -179,12 +198,35 @@ function drawFrame() {
     ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
     ctx.fill();
 
+    if (c.creator && PARTY.includes(c.creator)){
+      ctx.font = '22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🎩', cx, cy - 8);
+    }
+
     // Draw name and ID above creature
     if (showCreatureText) {
+
+      // Draw name and ID above creature
       ctx.fillStyle = "white";
       ctx.font = "8px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`${c.name} (${c.id})`, cx, cy - 10);
+      ctx.fillText(`${c.name} (${c.id})`, c.position[0], c.position[1] - 10);
+
+      // Draw health bar
+      const barWidth = 30;
+      const barHeight = 4;
+      const barX = c.position[0] - barWidth / 2;
+      const barY = c.position[1] - 22;
+      const energyRatio = Math.max(0, Math.min(1, c.energy / 100)); // clamp 0–1
+
+      // Red background
+      ctx.fillStyle = "red";
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+
+      // Green foreground
+      ctx.fillStyle = "lime";
+      ctx.fillRect(barX, barY, barWidth * energyRatio, barHeight);
     }
   }
 
@@ -208,12 +250,44 @@ function advanceFrames() {
       parseDeltaFrame(delta.creatures || "");
       parseFoodFrame(delta.new_food || "", delta.deleted_food || "");
       appliedDelta = true;
+
+      
+
     }
+
+    // Reduce energy for all creatures
+    for (const creature of Object.values(CREATURES)) {
+      creature.energy -= 0.01;
+
+      const layout = SPRITES[creature.sprite_id];
+      const organs = layout.split("|").filter(Boolean).map(line => {
+        const [type, x, y, size] = line.split(",");
+        return {
+          type,
+          x: parseFloat(x),
+          y: parseFloat(y),
+          size: parseFloat(size),
+        };
+      });
+
+      for (const organ of organs) {
+        switch (organ.type) {
+          case "flipper": creature.energy -= 0.001 * organ.size; break;
+          case "spike": creature.energy -= 0.001 * organ.size; break;
+          default: ctx.fillStyle = "#ccc"; break;
+        }
+
+      }
+
+    }
+
     currentFrame++;
-  }
 
   if (appliedDelta) drawFrame(); // Only draw if we actually applied updates
+  
+  }
 }
+
 
 
 //fetchSprites();
@@ -332,7 +406,10 @@ function applyFullState({ creatures, food, sprites, frame, deltas }) {
       name: c.name,
       position: c.position,
       direction: c.direction || 0,
-      sprite_id: c.sprite_id
+      sprite_id: c.sprite_id,
+      energy: c.energy,
+      parent_id: c.parent_id,
+      creator: c.creator
     };
   }
 
