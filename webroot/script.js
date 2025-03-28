@@ -45,6 +45,8 @@ function parseDeltaFrame(frameStr) {
         parent_ids,
         creator
       };
+
+      drawFrame();
     }
     
     else if (e.startsWith("m[")) {
@@ -263,7 +265,6 @@ function drawFrame() {
       ctx.font = "8px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(`${c.name} (${c.id})`, c.position[0], c.position[1] - 10);
-      ctx.fillText(`${c.parent_ids.toString()}`, c.position[0], c.position[1] - 15);
 
       // Draw health bar
       const barWidth = 30;
@@ -283,12 +284,16 @@ function drawFrame() {
   }
 
   //frameDisplay.textContent = `Frame: ${currentFrame}`;
-  document.getElementById("frameCount").textContent = currentFrame;
+  
 }
 
 
 
+let lastFrameBlock = 0;
+
 function advanceFrames() {
+
+  if (pause) return;
       
   const now = Date.now();
   const elapsedMs = now - lastRealTime;
@@ -335,7 +340,18 @@ function advanceFrames() {
 
     currentFrame++;
 
-  if (appliedDelta) drawFrame(); // Only draw if we actually applied updates
+    document.getElementById("frameCount").textContent = currentFrame;
+
+  }
+
+  /*
+  console.log(currentFrame);
+  console.log(lastFrameBlock);
+  */
+
+  if (appliedDelta && (currentFrame < (lastFrameBlock + 300))) {
+    
+    drawFrame(); // Only draw if we actually applied updates
   
   }
 }
@@ -344,43 +360,73 @@ function advanceFrames() {
 
 //fetchSprites();
 
+let pause = false;
+
 setInterval(advanceFrames, 1000 / 30);
-
-
 
 
 // 🔄 Apply full state from backend
 function applyFullState({ creatures, food, sprites, frame, deltas }) {
-  CREATURES = {};
-  FOOD = new Set();
-  deltaFrames = {};
 
-  for (const c of creatures) {
-    CREATURES[c.id] = {
-      id: c.id,
-      name: c.name,
-      position: c.position,
-      direction: c.direction || 0,
-      sprite_id: c.sprite_id,
-      energy: c.energy,
-      parent_ids: typeof c.parent_ids === "string" ? JSON.parse(c.parent_ids) : c.parent_ids,
-      creator: c.creator
-    };
+  if (frame === lastFrameBlock) {
+
+    pause = true;
+
+    document.getElementById("server").textContent = "Waiting for server to catch up";
+
+    return
+
   }
+
+  else {
+    
+    lastFrameBlock = frame;
+
+    pause = false;
+
+    document.getElementById("server").textContent = "";
+
+    
+
+  }
+
+  
+
+  // Update existing creatures and add new ones
+  
+  for (const c of creatures) {
+    const existing = CREATURES[c.id];
+    if (!existing) {
+      CREATURES[c.id] = {
+        id: c.id,
+        name: c.name,
+        position: c.position,
+        direction: c.direction,
+        sprite_id: c.sprite_id,
+        energy: c.energy,
+        parent_ids: typeof c.parent_ids === "string" ? JSON.parse(c.parent_ids) : c.parent_ids,
+        creator: c.creator
+      };
+    }
+  }
+
+  // Remove creatures that no longer exist
+
+  FOOD.clear();
 
   for (const f of food) {
     FOOD.add(`${f[0]},${f[1]}`);
   }
 
-  SPRITES = sprites
+  SPRITES = sprites;
 
-  deltaFrames = deltas || {};
-
-  drawFrame();
+  deltaFrames = deltas;
 
   currentFrame = frame + 1;
   lastRealTime = Date.now();
   baseSimFrame = frame + 1;
+
+
 }
 
 // 🔁 Devvit messaging
@@ -406,6 +452,8 @@ addEventListener("message", (event) => {
       //document.getElementById("frameCount").textContent = frame;
       document.getElementById("deltaCount").textContent = Object.keys(deltas ?? {}).length;
       document.getElementById("spriteCount").textContent = Object.keys(sprites ?? {}).length;
+
+      document.getElementById("frameBlock").textContent = frame;
 
       // Clear any loading message
       document.getElementById("status").textContent = "";

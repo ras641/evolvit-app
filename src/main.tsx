@@ -1,9 +1,4 @@
-import './createPost.js';
-
-import { Devvit, useState, useWebView, RedditAPI } from '@devvit/public-api';
-import type { JSONValue } from '@devvit/public-api';
-import type { DevvitMessage, WebViewMessage } from './message.js';
-import type { FormOnSubmitEvent, FormOnSubmitContext } from '@devvit/public-api';
+import { Devvit, useState, useWebView } from '@devvit/public-api';
 
 Devvit.configure({
   redditAPI: true,
@@ -26,9 +21,9 @@ type PageProps = {
 
 
 const TopTabBar = ({ setPage }: PageProps) => (
-  <hstack gap="small" alignment="center">
+  <hstack gap="medium" alignment="center">
     <button onPress={() => setPage('home')}>🏠 Home</button>
-    <button onPress={() => setPage('create')}>🛠️ Create</button>
+    <button onPress={() => setPage('create')}>🛠️ Build</button>
     <button onPress={() => setPage('info')}>ℹ️ Info</button>
     <button onPress={() => setPage('specs')}>🤓 Specs</button>
     
@@ -36,13 +31,15 @@ const TopTabBar = ({ setPage }: PageProps) => (
 );
 
 const HomePage = () => (
-  <vstack gap="medium">
+  <vstack gap="medium" alignment="center">
     <text size="xxlarge" weight="bold"> 🧬 Evolvit Creature Simulator</text>
-    <text>Welcome!</text>
-    <text>Use the tabs above to explore.</text>
-    <text>Or click below to see the world</text>
+    <text>&nbsp;&nbsp;&nbsp;&nbsp;Welcome to Evolvit!</text>
+    <text>&nbsp;&nbsp;&nbsp;&nbsp;Use the tabs above to explore.</text>
+    <text>&nbsp;&nbsp;&nbsp;&nbsp;Or click below to see the world</text>
   </vstack>
 );
+
+let organCounter = 0;
 
 const CreatePage = (context) => {
   const [creatureName, setCreatureName] = useState<string | null>(null);
@@ -55,15 +52,23 @@ const CreatePage = (context) => {
           type: 'string',
           name: 'name',
           label: 'Creature Name',
-          placeholder: 'e.g., Spikeling',
+          placeholder: 'e.g., spikeling',
         },
       ],
     },
     async (values) => {
       const name = values.name?.trim();
       if (!name) return;
-
-      setCreatureName(name); // Save it but don't submit yet
+  
+      const isValid = /^[a-z]+$/.test(name);
+      if (!isValid) {
+        await context.ui.showToast({
+          text: `⚠️ Name can only contain lowercase letters (a-z), no spaces or special characters.`,
+        });
+        return;
+      }
+  
+      setCreatureName(name);
       await context.ui.showToast({ text: `💾 Name set to "${name}"` });
     }
   );
@@ -114,9 +119,9 @@ const CreatePage = (context) => {
       const size = parseInt(values.size, 10);
       const x = Number(values.x);
       const y = Number(values.y);
-  
+    
       if (!type || isNaN(size) || isNaN(x) || isNaN(y)) return;
-  
+    
       if (x < -50 || x > 50) {
         context.ui.showToast({ text: '❌ Position X must be between -50 and 50' });
         return;
@@ -125,13 +130,13 @@ const CreatePage = (context) => {
         context.ui.showToast({ text: '❌ Position Y must be between -50 and 50' });
         return;
       }
-
+    
       // Check that no part of the organ extends beyond [-50, 50]
       if (x - size < -50 || x + size > 50 || y - size < -50 || y + size > 50) {
         context.ui.showToast({ text: '❌ Organ extends outside the valid area (-50 to 50)' });
         return;
       }
-
+    
       // Check against body (always at [0, 0], size 8)
       const dxBody = x - 0;
       const dyBody = y - 0;
@@ -140,7 +145,7 @@ const CreatePage = (context) => {
         context.ui.showToast({ text: '❌ Organ overlaps with the main body (size 8)' });
         return;
       }
-
+    
       // Check against existing organs
       for (const organ of organs) {
         const [ox, oy] = organ.relative_position;
@@ -152,23 +157,41 @@ const CreatePage = (context) => {
           return;
         }
       }
-  
-      setOrgans((prev) => [
-        ...prev,
-        {
-          type,
-          size,
-          relative_position: [x, y],
-        },
-      ]);
-  
-      await context.ui.showToast({ text: `➕ Added ${type}` });
+    
+      // Generate ID like flipper1, eye2, etc.
+      const countOfType = organs.filter((o) => o.type === type).length;
+      const id = `${type}${countOfType + 1}`;
+    
+      setOrgans((prev) => {
+        organCounter += 1;
+        const id = `organ${organCounter}`;
+      
+        return [
+          ...prev,
+          {
+            id,
+            type,
+            size,
+            relative_position: [x, y],
+          },
+        ];
+      });
+    
+      await context.ui.showToast({ text: `➕ Added ${id}` });
     }
+    
   );
 
   const submitCreature = async () => {
 
     if (!creatureName) {
+      await context.ui.showToast({ text: '⚠️ Please set a valid creature name before submitting.' });
+      return;
+    }
+  
+    const isValid = /^[a-z]+$/.test(creatureName);
+    if (!isValid) {
+      await context.ui.showToast({ text: '⚠️ Creature name must contain only lowercase letters (a-z).' });
       return;
     }
 
@@ -217,13 +240,13 @@ const CreatePage = (context) => {
   };
 
   return (
-    <vstack gap="medium">
-      <text size="xxlarge" weight="bold"> 🛠️ Create</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Organs can't touch or overlap each other or the body</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Size is always measured by radius</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• The main body is always size 8 and in the center (0,0)</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• No part of any organ can go outside -50 to 50 in x or y</text>
-      <text size="small">&nbsp;&nbsp;&nbsp;&nbsp;• Flippers always face in positive X</text>
+    <vstack gap="small">
+      <text size="xxlarge" weight="bold"> 🛠️ Build</text>
+      <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Organs can't touch or overlap each other or the body</text>
+      <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Size is always measured by radius</text>
+      <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• The main body is always size 8 and in the center (0,0)</text>
+      <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• No part of any organ can go outside -50 to 50 in x or y</text>
+      <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Flippers always face in positive X</text>
       <hstack gap="small" alignment="center">
         <button size="small" width="30%" onPress={() => context.ui.showForm(nameForm)}>
           📝 Edit Name
@@ -234,7 +257,7 @@ const CreatePage = (context) => {
           ➕ Add Organ
         </button>
 
-        <button size="small" width="30%" onPress={submitCreature}>✅ Submit Creature</button>
+        <button size="small" width="30%" onPress={submitCreature}>🌏 Put in World</button>
 
       </hstack>
 
@@ -245,17 +268,39 @@ const CreatePage = (context) => {
         </hstack>
       )}
 
+
+
       {organs.length > 0 && (
         <vstack gap="small">
-          <text weight="bold">🧠 Organs:</text>
-          {organs.map((o, i) => (
-            <text key={i}>
-              {o.type} at ({o.relative_position[0]}, {o.relative_position[1]}), size {o.size}
-            </text>
-          ))}
-          
+          <hstack gap="small"  alignment="start">
+            {organs.map((o) => (
+              <vstack
+                key={o.id}
+                gap="small"
+                alignment="center"
+              >
+                <text size="xsmall">
+                  {o.type} 
+                  
+                </text>
+                <text size="xsmall">
+                  ({o.relative_position[0]}, {o.relative_position[1]})
+                </text>
+                <text size="xsmall">
+                  size {o.size}
+                </text>
+                <button
+                  size="small"
+                  onPress={() => {
+                    setOrgans((prev) => prev.filter((org) => org.id !== o.id));
+                  }}
+                >
+                  ❌
+                </button>
+              </vstack>
+            ))}
+          </hstack>
         </vstack>
-
       )}
 
       
@@ -267,19 +312,19 @@ const CreatePage = (context) => {
 const InfoPage = () => (
   <vstack gap="small">
     <text size="xxlarge" weight="bold"> ℹ️ Info</text>
-    <text size="xsmall">Think you know what it takes in the harsh, unforgiving Evolvit landscape.</text>
-    <text size="xsmall">Build your creature and see if it can survive or even thrive in a dynamic world</text>
-    <text size="xsmall">Creatures will lose energy over time unless they eat food at 0 they will die 🟢</text>
-    <text size="xsmall">Creatures all begin with 50/100 energy</text>
-    <text size="xsmall">At 100 energy creatures will use 60 energy to reproduce a mutated offspring</text>
-    <text size="xsmall">Offspring spawn with 50 energy</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Think you know what it takes in the harsh, unforgiving Evolvit landscape.</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Build your creature and see if it can survive or even thrive in a dynamic world</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Creatures will lose energy over time unless they eat food at 0 they will die 🟢</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Creatures all begin with 50/100 energy</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• At 100 energy creatures will use 60 energy to reproduce a mutated offspring</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Offspring spawn with 50 energy</text>
 
-    <text size="xsmall">All creatures have a central body 🔵 of radius 8</text>
-    <text size="xsmall">They then have up to 5 of 4 optional organs with optional radius</text>
-    <text size="xsmall">🟡 Mouth: highly recommend at least one you will need this to eat</text>
-    <text size="xsmall">🟠 Flipper: uses energy to generate thrust, helpful for moving</text>
-    <text size="xsmall">🔴 Spike: Kills other creatures on contact or their organs on contact. also costs energy over time</text>
-    <text size="xsmall">⚪ Eye: doesn't do anything (yet)</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• All creatures have a central body 🔵 of radius 8</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• They then have up to 5 of 4 optional organs with optional radius</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🟡 Mouth: highly recommend at least one you will need this to eat</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🟠 Flipper: uses energy to generate thrust, helpful for moving</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🔴 Spike: Kills other creatures on contact or their organs on contact. also costs energy over time</text>
+    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⚪ Eye: doesn't do anything (yet)</text>
   </vstack>
 );
 
@@ -292,11 +337,9 @@ const SpecsPage = () => (
     <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• BMR (basic survival cost): 0.01 e/f (0.3 e/s)</text>
 
     <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Spike organ:</text>
-    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Kills organs upon contact, kills creatures on body contact</text>
     <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Energy use: 0.001 × size (radius in pixels) e/f (0.03 × size per second)</text>
 
     <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;• Flipper organ:</text>
-    <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Generates thrust</text>
     <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Energy use: 0.001 × size (radius in pixels) e/f (0.03 × size per second)</text>
     <text size="xsmall">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Force output: 0.5 × size (in px × mass / frame²) (I think?)</text>
     
